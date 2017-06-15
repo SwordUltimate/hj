@@ -1,5 +1,4 @@
 <!doctype html>
-<script src="code/json.js"></script>
 <head>
 <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
 
@@ -100,57 +99,20 @@ label {
 	padding-left: 20px;
 }
 </style>
-
+<script type="text/javascript" src="js/jquery-3.1.1.min.js"></script>
 <script type="text/javascript">
-	// 用户名，密码
-	function RunGameUser(name, pwd) {
-		this.name = name;
-		this.pwd = pwd;
-	}
-	// 用户名，登录时间
-	function LoginUser(name, loginTime) {
-		this.name = name;
-		this.loginTime = loginTime;
-	}
-
+	// 用户名
 	var loginUser;
+	// 服务器地址
+	var serverUrl = "http://127.0.0.1:8888";
 
 	window.onload = function() {
-		if (!checkLogin()) {
-			// 显示遮罩层
-			showPanel("mark");
-			// 弹出登录页面
-			showPanel("loginPanel");
-			// focus
-			document.getElementById("name").focus();
-		}
-	}
-
-	function checkLogin() {
-		// 判断session中是否有已登录用户
-		var userStr = localStorage.getItem("runGameLoginUser");
-		if (userStr == null)
-			return false;
-		// 判断session是否过期
-		loginUser = JSON.parse(userStr);
-		// 获取登录时间
-		var ts = loginUser.loginTime;
-		// 当前时间
-		var n = Date.parse(new Date());
-		var diff = (n - ts) / 1000 / 60;
-		// 超期则移除
-		if (diff > 30) {
-			localStorage.removeItem("runGameLoginUser");
-			// 将loginUser置空
-			loginUser = null;
-			return false;
-		}
-		if (loginUser == null) {
-			return false;
-		}
-		// 显示登录用户
-		document.getElementById("userName").innerHTML = loginUser.name;
-		return true;
+		// 显示遮罩层
+		showPanel("mark");
+		// 弹出登录页面
+		showPanel("loginPanel");
+		// focus
+		document.getElementById("name").focus();
 	}
 
 	// 显示层
@@ -181,24 +143,20 @@ label {
 			txtPwd.focus();
 			return;
 		}
-		// 匹配账号密码
-		var usersStr = localStorage.getItem("runGameUsers");
-		// 遍历本地存储，判断用户名是否存在
-		if (usersStr == null) {
-			msgLogin.innerHTML = "用户名或密码错误!";
-		} else {
-			// 获取已有的localUsers
-			localUsers = JSON.parse(usersStr);
-			for (var i = 0; i < localUsers.length; i++) {
-				var user = JSON.parse(localUsers[i]);
-				if (user.name == txtName.value && user.pwd == txtPwd.value) {
-					loginUser = new RunGameUser(txtName.value, txtPwd.value);
+		// 登录
+		$.ajax({
+			url : serverUrl + '/login/' + txtName.value + '/' + txtPwd.value,
+			type : 'POST', //GET
+			data : {},
+			dataType : 'json', //返回的数据格式：json/xml/html/script/jsonp/text
+			success : function(data, textStatus, jqXHR) {
+				alert(data.msg);
+				if (data.msg == "登录成功！") {
 					// 登录成功
 					loginSuccess(txtName.value);
 				}
 			}
-			msgLogin.innerHTML = "用户名或密码错误!";
-		}
+		});
 	};
 
 	// 打开注册面板
@@ -225,56 +183,30 @@ label {
 			pwd.focus();
 			return;
 		}
-		// 写入本地存储
-		var localUsers = new Array();
-		var usersStr = localStorage.getItem("runGameUsers");
-		// 遍历本地存储，判断用户名是否存在
-		if (usersStr == null) {
-			var user = new RunGameUser(userName.value, pwd.value);
-			localUsers.push(JSON.stringify(user));
-		} else {
-			// 获取已有的localUsers
-			localUsers = JSON.parse(usersStr);
-			for (var i = 0; i < localUsers.length; i++) {
-				var user = JSON.parse(localUsers[i]);
-				if (user.name == userName.value) {
-					document.getElementById("msgRName").innerHTML = "用户名已存在！";
-					return;
+		$.ajax({
+			url : serverUrl + '/register/' + userName.value + '/' + pwd.value,
+			type : 'POST', //GET
+			data : {},
+			dataType : 'json', //返回的数据格式：json/xml/html/script/jsonp/text
+			success : function(data, textStatus, jqXHR) {
+				alert(data.msg);
+				if (data.msg == "注册成功，系统将自动登录！") {
+					// 登录成功
+					loginSuccess(userName.value);
 				}
 			}
-			// 写入用户
-			localUsers.push(JSON.stringify(new RunGameUser(userName.value,
-					pwd.value)));
-		}
-		// 转变成对象存储
-		localStorage.setItem("runGameUsers", JSON.stringify(localUsers));
-
-		// 自动登录
-		loginSuccess(userName.value);
+		});
 	}
 
 	// 登陆成功
 	function loginSuccess(userName) {
 		// 设置登录用户
-		loginUser = new LoginUser(userName, Date.parse(new Date()));
+		loginUser = userName;
 		// 显示登录用户
-		document.getElementById("userName").innerHTML = loginUser.name;
-		
-		// 写入用户登录情况，有则覆盖
-		localStorage.setItem("runGameLoginUser", JSON.stringify(loginUser));
+		document.getElementById("userName").innerHTML = loginUser;
 
 		// 隐藏mark窗口
 		hidePanel("mark");
-	}
-
-	// 用于演示方便用，清除登录数据
-	function clearLoginData() {
-		localStorage.removeItem("runGameLoginUser");
-	}
-
-	// 用于演示方便用，清除积分数据
-	function clearScoringData() {
-		localStorage.removeItem("scoring");
 	}
 
 	// 显示得分排名
@@ -290,36 +222,65 @@ label {
 			for (var i = trs.length - 1; i > 0; i--) {
 				table.deleteRow(i);
 			}
-			// 获取积分，前五
-			var scoringStr = localStorage.getItem("scoring");
-			if (scoringStr == null)
-				return;
-			var scoringArr = JSON.parse(scoringStr);
-			for (var i = 0; i < scoringArr.length; i++) {
-				var scoring = JSON.parse(scoringArr[i]);
-				var playTime = scoring.playTime;
-				var name = scoring.name;
-				var score = scoring.score;
-				var newTr = table.insertRow();
-				var td1 = newTr.insertCell();
-				td1.innerHTML = (i + 1) + ".";
-				var td2 = newTr.insertCell();
-				td2.innerHTML = name;
-				var td3 = newTr.insertCell();
-				td3.innerHTML = score;
-				// 构建时间
-				var newDate = new Date();
-				newDate.setTime(playTime);
-				var td4 = newTr.insertCell();
-				td4.innerHTML = newDate.toLocaleString();
-			}
+			// 保存分数
+			$
+					.ajax({
+						url : serverUrl + '/queryRecord',
+						type : 'POST', // GET
+						data : {},
+						dataType : 'json', // 返回的数据格式：json/xml/html/script/jsonp/text
+						success : function(data, textStatus, jqXHR) {
+							if (data.msg == "error") {
+								alert("文件不存在！");
+							} else {// 获取积分，取前五
+								var scoringStr = data.msg;
+								console.info(scoringStr);
+								if (scoringStr == undefined
+										|| scoringStr == null
+										|| scoringStr == null)
+									return;
+								//json数组
+								var scoringArr = JSON.parse(scoringStr);
+								// 转换为对象数组
+								var objectArr = new Array();
+								for (var i = 0; i < scoringArr.length; i++) {
+									var item = JSON.parse(JSON
+											.stringify(scoringArr[i]));
+									objectArr.push(item);
+								}
+								// 将数组按照积分进行倒叙排序
+								objectArr.sort(function(a, b) {
+									return b.score - a.score
+								});
+								// 取前5
+								for (var i = 0; i < Math.min(5,
+										objectArr.length); i++) {
+									var item = objectArr[i];
+									var newTr = table.insertRow();
+									var td1 = newTr.insertCell();
+									td1.innerHTML = (i + 1) + ".";
+									var td2 = newTr.insertCell();
+									td2.innerHTML = item.name;
+									var td3 = newTr.insertCell();
+									td3.innerHTML = item.score;
+									// 构建时间
+									var newDate = new Date();
+									newDate.setTime(item.time);
+									var td4 = newTr.insertCell();
+									td4.innerHTML = newDate.toLocaleString();
+								}
+							}
+
+						}
+					});
+
 		} else {
 			hidePanel("scorePanel");
 			lk.innerHTML = "显示积分面板";
 		}
 	}
-	
-	function cancel(){
+
+	function cancel() {
 		hidePanel("registerPanel");
 		showPanel("loginPanel");
 	}
@@ -353,8 +314,8 @@ label {
 				</tr>
 				<tr>
 					<td colspan="2"><input type="button" value="登 录"
-						onclick="doLogin();">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<input type="button" value="注 册"
-						onclick="register();"></td>
+						onclick="doLogin();">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<input
+						type="button" value="注 册" onclick="register();"></td>
 				</tr>
 			</table>
 		</div>
@@ -376,8 +337,8 @@ label {
 				</tr>
 				<tr>
 					<td colspan="2"><input type="button" value="注册并登录"
-						onclick="doRegister();">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<input type="button" value="取 消"
-						onclick="cancel();"></td>
+						onclick="doRegister();">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<input
+						type="button" value="取 消" onclick="cancel();"></td>
 				</tr>
 			</table>
 		</div>
@@ -391,15 +352,12 @@ label {
 			得分：<font><b><label id="score">0</label></b></font>&nbsp;&nbsp;&nbsp;&nbsp;<a
 				id="lk_scoring" href="#" onclick="toggleScoring();" />显示积分面板</a>
 		</div>
-		<div style="float: right; margin-right: 35px; margin-top: 10px;">
-			<input type="button" value="清除登录数据" onclick="clearLoginData();" />&nbsp;&nbsp;<input
-				type="button" value="清除积分数据" onclick="clearScoringData();" />
-		</div>
 	</div>
 
 	<div id="scorePanel"
-		style="position: absolute; top: 100px; left: 50%; width: 400px; height: 300px; margin-left: -200px; text-align: center; display: none; background-color:  #F5FBFF;">
-		<table id="scoring_table" style="width: 100%;">
+		style="position: absolute; top: 100px; left: 50%; width: 400px; height: 300px; margin-left: -200px; text-align: center; display: none; background-color: #F5FBFF;">
+		<div style="width:100%;height:30px;margin-top:10px;line-height:30px;font-weight:bold;">积分排行</div>
+		<table id="scoring_table" style="width: 380px;margin-left:10px;height:230px;">
 			<tr>
 				<th width="40px">序号</th>
 				<th width="60px">账号</th>
